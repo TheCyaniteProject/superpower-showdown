@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Item Leaderboard</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        /* Style for the login button in the top right corner */
+        .login-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #007BFF;
+            color: #fff;
+            padding: 8px 12px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+
+            .login-button:hover {
+                background-color: #0056b3;
+            }
+
+        h1 {
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+
+        li {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        a {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+
+        #loading {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login button in the top right corner -->
+    <a href="login.html" class="login-button">Login</a>
+
+    <h1>Superpower Showdown</h1>
+    <a href="play.html">What's your favorite?</a>
+    <h2>Leaderboard:</h2>
+    <div id="loading">Loading items...</div>
+    <ul id="leaderboardList" style="display:none;"></ul>
+
+    <script>
+        // When the page loads, fetch the sorted items from the API.
+        fetch('/api/items')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not OK');
+                }
+                return response.json();
+            })
+            .then(items => {
+                // Once we have the data, hide the loading message and show the list.
+                document.getElementById("loading").style.display = 'none';
+                const leaderboard = document.getElementById("leaderboardList");
+                leaderboard.style.display = 'block';
+
+                // Loop over the items and display them with ranking numbers.
+                items.forEach((item, index) => {
+                    const li = document.createElement("li");
+                    // Using index+1 for ranking. Weight is not shown.
+                    if (index + 1 == 1) {
+                        li.textContent = `First: ${item.name}: ${item.description}`;
+                    }
+                    else if (index + 1 == 2) {
+                        li.textContent = `Second: ${item.name}: ${item.description}`;
+                    }
+                    else if (index + 1 == 3) {
+                        li.textContent = `Third: ${item.name}: ${item.description}`;
+                    }
+                    else {
+                        li.textContent = `${index + 1}: ${item.name}: ${item.description}`;
+                    }
+                    leaderboard.appendChild(li);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching items:', error);
+                document.getElementById("loading").textContent = "Error loading items.";
+            });
+    </script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ranking Game</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+        }
+
+        .item-container {
+            display: inline-block;
+            width: 40%;
+            vertical-align: top;
+            padding: 20px;
+            border: 1px solid #ccc;
+            margin: 10px;
+            cursor: pointer;
+        }
+
+            .item-container:hover {
+                background-color: #f9f9f9;
+            }
+
+        .item-name {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .item-description {
+            font-size: 1em;
+            color: #555;
+        }
+
+        #message {
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+
+        a {
+            display: block;
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+
+        #loading {
+            font-size: 1.2em;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <h1>What Do You Prefer?</h1>
+    <div id="loading">Loading items...</div>
+    <div id="gameArea" style="display: none;">
+        <div id="itemA" class="item-container"></div>
+        <h1 id="or">OR</h1>
+        <div id="itemB" class="item-container"></div>
+    </div>
+    <div id="message"></div>
+    <a href="index.html">Back to Leaderboard</a>
+
+    <script>
+        // Global variables to store the items and game state.
+        let allItems = [];
+        let unusedItems = [];
+        let currentPair = { left: null, right: null };
+        let selectionCount = 0;
+
+        const itemAEl = document.getElementById("itemA");
+        const itemBEl = document.getElementById("itemB");
+        const itemOR = document.getElementById("or");
+        const gameAreaEl = document.getElementById("gameArea");
+        const loadingEl = document.getElementById("loading");
+        const messageEl = document.getElementById("message");
+
+        // Fetch the items from the API
+        fetch('/api/items')
+            .then(response => {
+                if (!response.ok) throw new Error("Network Error");
+                return response.json();
+            })
+            .then(items => {
+                allItems = items;
+                // Make a copy for this session�s unused items.
+                unusedItems = [...allItems];
+                loadingEl.style.display = 'none';
+                gameAreaEl.style.display = 'block';
+                initPair();
+            })
+            .catch(error => {
+                console.error("Error loading items:", error);
+                loadingEl.textContent = "Error loading items.";
+            });
+
+        // Helper: Randomly select and remove an item from unusedItems.
+        function getRandomUnusedItem() {
+            if (unusedItems.length === 0) return null;
+            const index = Math.floor(Math.random() * unusedItems.length);
+            return unusedItems.splice(index, 1)[0];
+        }
+
+        // Initialize the pair: if a side is missing, pick a new random item.
+        function initPair() {
+            if (!currentPair.left) {
+                currentPair.left = getRandomUnusedItem();
+            }
+            if (!currentPair.right) {
+                currentPair.right = getRandomUnusedItem();
+            }
+            renderPair();
+        }
+
+        // Display the current pair.
+        function renderPair() {
+            // Check if both items are missing (end of game).
+            if (!currentPair.left && !currentPair.right) {
+                messageEl.textContent = "You reached the end of the list!";
+                itemAEl.style.display = "none";
+                itemBEl.style.display = "none";
+                itemOR.style.display = "none";
+                return;
+            }
+
+            if (currentPair.left) {
+                itemAEl.innerHTML = `
+                <div class="item-name">${currentPair.left.name}</div>
+                <div class="item-description">${currentPair.left.description}</div>
+              `;
+                itemAEl.style.display = "inline-block";
+            } else {
+                itemAEl.style.display = "none";
+                itemOR.style.display = "none";
+                itemBEl.style.display = "none";
+            }
+
+            if (currentPair.right) {
+                itemBEl.innerHTML = `
+                <div class="item-name">${currentPair.right.name}</div>
+                <div class="item-description">${currentPair.right.description}</div>
+              `;
+                itemBEl.style.display = "inline-block";
+            } else {
+                itemAEl.style.display = "none";
+                itemOR.style.display = "none";
+                itemBEl.style.display = "none";
+            }
+        }
+
+        // Sends the vote to the server and updates the local game state.
+        function onItemClicked(chosenSide) {
+            if (!currentPair.left || !currentPair.right) return;
+
+            let chosenItem, unchosenItem;
+            if (chosenSide === "left") {
+                chosenItem = currentPair.left;
+                unchosenItem = currentPair.right;
+            } else {
+                chosenItem = currentPair.right;
+                unchosenItem = currentPair.left;
+            }
+
+            // Prepare the payload.
+            const payload = {
+                chosenId: chosenItem.id,
+                unchosenId: unchosenItem.id
+            };
+
+            // Send the vote update to our API.
+            fetch('/api/vote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error('Vote submission failed');
+                    return response.json();
+                })
+                .then(data => {
+                    // In this example we assume the vote was saved successfully.
+                    // Optionally, you might update currentPair items using data.items from the response.
+                    selectionCount++;
+                    // Replace the unpicked item with a new random item.
+                    let newItem = getRandomUnusedItem();
+                    if (chosenSide === "left") {
+                        currentPair.right = newItem;
+                    } else {
+                        currentPair.left = newItem;
+                    }
+                    renderPair();
+
+                    // Optionally show a message after a few selections.
+                    if (selectionCount >= 5) {
+                        messageEl.textContent = "Thanks for voting! Your votes have been recorded.";
+                    }
+                })
+                .catch(error => {
+                    console.error("Error in vote submission:", error);
+                    messageEl.textContent = "Error submitting your vote. Please try again.";
+                });
+        }
+
+        // Attach click event listeners to the item containers.
+        itemAEl.addEventListener("click", () => onItemClicked("left"));
+        itemBEl.addEventListener("click", () => onItemClicked("right"));
+    </script>
+</body>
+</html>
